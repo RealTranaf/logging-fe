@@ -1,10 +1,10 @@
 import './App.css'
 import { useState, useEffect } from 'react'
 import { getAllGames, getGameById, deleteGame, updateGame, addGame } from './services/game-service'
+import { logEvent } from './services/log-service'
 import GameModal from "./modals/GameModal"
 
 function App() {
-
     const [games, setGames] = useState([])
     const [platform, setPlatform] = useState("")
     const [status, setStatus] = useState("")
@@ -15,9 +15,13 @@ function App() {
 
     const fetchGames = async () => {
         try {
+            logEvent("INFO", "Fetching game list")
             const response = await getAllGames(platform, status)
             setGames(response.data)
+            
+            logEvent("INFO", `Fetched ${response.data.length} games`)
         } catch (error) {
+            logEvent("ERROR", "Failed to fetch games")
             console.log(error)
         }
     }
@@ -34,9 +38,11 @@ function App() {
                 selectedGame.platform,
                 selectedGame.status
             )
+            logEvent("INFO", `Game added: ${selectedGame.name}`)
             setModalOpen(false)
             fetchGames()
         } catch (error) {
+            logEvent("ERROR", `Failed to add game: ${selectedGame?.name}`)
             console.error(error)
         }
     }
@@ -44,9 +50,11 @@ function App() {
     const handleUpdate = async () => {
         try {
             await updateGame(selectedGame.id, selectedGame.name, selectedGame.description, selectedGame.platform, selectedGame.status)
+            logEvent("INFO", `Game updated: ${selectedGame.name}`)
             setModalOpen(false)
             fetchGames()
         } catch (error) {
+            logEvent("ERROR", `Failed to update game: ${selectedGame?.name}`)   
             console.error(error)
         }
     }
@@ -55,15 +63,18 @@ function App() {
         if (!window.confirm("Xóa game này?")) return
 
         try {
-            await deleteGame(id);
+            await deleteGame(id)
+            logEvent("WARN", `Game deleted with id ${id}`)
             setModalOpen(false)
             fetchGames()
         } catch (error) {
-            console.error(error);
+            logEvent("ERROR", `Failed to delete game with id ${id}`)
+            console.error(error)
         }
     }
 
     const openAddModal = () => {
+        logEvent("INFO", "Opened add game modal")
         setSelectedGame({
             name: "",
             description: "",
@@ -76,10 +87,15 @@ function App() {
     }
 
     const openEditModal = async (id) => {
-        const game = await getGameById(id)
-        setSelectedGame(game.data)
-        setModalMode("edit")
-        setModalOpen(true)
+        try {
+            const game = await getGameById(id)
+            logEvent("INFO", `Opened edit game modal for game ${game.data.name}`)
+            setSelectedGame(game.data)
+            setModalMode("edit")
+            setModalOpen(true)
+        } catch (error) {
+            logEvent("ERROR", `Failed to load game ${id}`)
+        }
     }
 
     const closeModal = () => {
