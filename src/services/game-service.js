@@ -1,6 +1,8 @@
 import axios from 'axios'
 
-const API_URL = 'http://localhost:8080/games'
+// const API_URL = 'http://localhost:8080/games'
+
+const API_URL = 'http://35.222.18.171:8080/games'
 
 export async function getAllGames(platform, status) {
     let url = `${API_URL}?platform=${platform}&status=${status}`
