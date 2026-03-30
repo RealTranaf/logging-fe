@@ -2,7 +2,9 @@ import axios from "axios";
 
 // const API_URL = 'http://localhost:8080/logs'
 
-const API_URL = 'http://35.222.18.171:8080/logs'
+// const API_URL = 'http://35.222.18.171:8080/logs'
+
+const API_URL = 'http://instance-20260224-064829.tailca11db.ts.net:8080/logs'
 
 export async function logEvent(level, message) {
     try {
