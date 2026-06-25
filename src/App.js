@@ -1,8 +1,10 @@
 import './App.css'
 import { useState, useEffect } from 'react'
 import { getAllGames, getGameById, deleteGame, updateGame, addGame } from './services/game-service'
-import { logEvent } from './services/log-service'
 import GameModal from "./modals/GameModal"
+
+import { logInfo, logError, logWarn } from './services/log-utils'
+import { gameSearchCounter, errorCounter, requestDuration } from './services/metric-utils'
 
 function App() {
     const [games, setGames] = useState([])
@@ -14,15 +16,38 @@ function App() {
     const [modalMode, setModalMode] = useState("edit")
 
     const fetchGames = async () => {
+
+        const startTime = performance.now()
+
         try {
-            logEvent("INFO", "Fetching game list")
             const response = await getAllGames(platform, status)
             setGames(response.data)
-            
-            logEvent("INFO", `Fetched ${response.data.length} games`)
+
+            gameSearchCounter.add(1, { platform, status })
+            logInfo('Lấy data game.', { platform, status })
+
+            const duration = (performance.now() - startTime) / 1000 // Convert to seconds
+            requestDuration.record(duration, {
+                'http.request.method': 'GET',
+                'http.response.status_code': response.status,
+                'http.route': `/games?platform=${platform}&status=${status}`,
+                'url.path': `/games?platform=${platform}&status=${status}`,
+                'url.scheme': window.location.protocol.replace(':', ''),
+            })
+
         } catch (error) {
-            logEvent("ERROR", "Failed to fetch games")
             console.log(error)
+            errorCounter.add(1, { operation: 'fetchGames' })
+            logError('Lấy data fail.', { error: error.message })
+
+            const duration = (performance.now() - startTime) / 1000 // Convert to seconds
+            requestDuration.record(duration, {
+                'http.request.method': 'GET',
+                'http.response.status_code': 0,
+                'http.route': `/games?platform=${platform}&status=${status}`,
+                'url.path': `/games?platform=${platform}&status=${status}`,
+                'url.scheme': window.location.protocol.replace(':', ''),
+            })
         }
     }
 
@@ -38,24 +63,24 @@ function App() {
                 selectedGame.platform,
                 selectedGame.status
             )
-            logEvent("INFO", `Game added: ${selectedGame.name}`)
             setModalOpen(false)
             fetchGames()
+            logInfo('Thêm game.', { selectedGame })
         } catch (error) {
-            logEvent("ERROR", `Failed to add game: ${selectedGame?.name}`)
             console.error(error)
+            logError('Thêm game fail.', { error: error.message })
         }
     }
 
     const handleUpdate = async () => {
         try {
             await updateGame(selectedGame.id, selectedGame.name, selectedGame.description, selectedGame.platform, selectedGame.status)
-            logEvent("INFO", `Game updated: ${selectedGame.name}`)
             setModalOpen(false)
             fetchGames()
+            logInfo('Cập nhật game.', { selectedGame })
         } catch (error) {
-            logEvent("ERROR", `Failed to update game: ${selectedGame?.name}`)   
             console.error(error)
+            logError('Cập nhật game fail.', { error: error.message })
         }
     }
 
@@ -64,17 +89,16 @@ function App() {
 
         try {
             await deleteGame(id)
-            logEvent("WARN", `Game deleted with id ${id}`)
             setModalOpen(false)
             fetchGames()
+            logInfo('Xóa game.', { id })
         } catch (error) {
-            logEvent("ERROR", `Failed to delete game with id ${id}`)
             console.error(error)
+            logError('Xóa game fail.', { error: error.message })
         }
     }
 
     const openAddModal = () => {
-        logEvent("INFO", "Opened add game modal")
         setSelectedGame({
             name: "",
             description: "",
@@ -84,27 +108,34 @@ function App() {
 
         setModalMode("add")
         setModalOpen(true)
+        logInfo('Mở ô thêm game.', {})
     }
 
     const openEditModal = async (id) => {
         try {
             const game = await getGameById(id)
-            logEvent("INFO", `Opened edit game modal for game ${game.data.name}`)
             setSelectedGame(game.data)
             setModalMode("edit")
             setModalOpen(true)
+            logInfo('Mở ô cập nhật game.', { id })
         } catch (error) {
-            logEvent("ERROR", `Failed to load game ${id}`)
+            console.log(error)
+            logInfo('Mở ô cập nhật game fail.', { error: error.message })
         }
     }
 
     const closeModal = () => {
         setModalOpen(false)
         setSelectedGame(null)
+        logInfo('Đóng ô.', {})
     }
 
     return (
         <div className='container'>
+            <div className="page-header">
+                <h1>Game Management</h1>
+                <p>Quản lý danh sách game phát hành</p>
+            </div>
             <div className="filters">
                 <select value={platform} onChange={(e) => setPlatform(e.target.value)}>
                     <option value="">Loại game</option>
@@ -126,19 +157,21 @@ function App() {
 
             <div className="game-grid">
                 {games.map((game) => (
-                    <div className="game-card" key={game.id}>
-
-                        <div className="platform-badge">
-                            Game {game.platform}
+                    <div className="game-card" key={game.id} onClick={() => openEditModal(game.id)}>
+                        <div className={`platform-badge ${game.platform.toLowerCase()}`}>
+                            {game.platform}
+                        </div>
+                        <div className={`status ${game.status.toLowerCase()}`}>
+                            {game.status}
                         </div>
                         <div className="game-title">{game.name}</div>
                         <p className="game-desc">{game.description}</p>
-                        <button
+                        {/* <button
                             className="game-btn"
                             onClick={() => openEditModal(game.id)}
                         >
                             Chi tiết
-                        </button>
+                        </button> */}
                     </div>
                 ))}
             </div>
